@@ -1,0 +1,89 @@
+diff --git a/services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp b/services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp
+--- a/services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp
++++ b/services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp
+@@ -19,6 +19,7 @@
+ #include "SessionConfigurationUtils.h"
+ #include <android/data_space.h>
+ #include <camera/StringUtils.h>
++#include <camera/VendorTagDescriptor.h>
+ #include <gui/Flags.h>  // remove with WB_LIBCAMERASERVICE_WITH_DEPENDENCIES
+ #include <ui/PublicFormat.h>
+ #include "../CameraService.h"
+@@ -1235,13 +1236,68 @@
+     return OK;
+ }
+ 
++namespace {
++
++// Session-parameter tags declared by the camera HAL itself.
++//
++// Samsung's camera HAL publishes its own session key list (shootingMode, ssmShotMode,
++// capturePhysicalId, adaptivePixelMode, ...) under the vendor tag
++// samsung.android.request.availableSessionKeys instead of the AOSP
++// android.request.availableSessionKeys. One UI's cameraserver validates session
++// parameters against that Samsung list; AOSP only validates against the AOSP list,
++// so every Samsung vendor session parameter is silently dropped here and neve
++// reaches the HAL, which then never enters its HighResolution (50 MP) usecase.
++std::vector<int32_t> getVendorSessionKeys(const CameraMetadata& deviceInfo,
++        metadata_vendor_id_t vendorTagId) {
++    static const char* kSamsungSessionKeys = "samsung.android.request.availableSessionKeys";
++
++    sp<VendorTagDescriptorCache> vTagsCache = VendorTagDescriptorCache::getGlobalVendorTagCache();
++    if (vTagsCache == nullptr) {
++        return {};
++    }
++
++    uint32_t vendorTag = 0;
++    bool resolved = false;
++    sp<VendorTagDescriptor> vTags;
++    if (vendorTagId != 0 &&
++            vTagsCache->getVendorTagDescriptor(vendorTagId, &vTags) == NO_ERROR &&
++            vTags != nullptr) {
++        resolved = CameraMetadata::getTagFromName(kSamsungSessionKeys, vTags.get(), &vendorTag) == OK;
++    }
++    if (!resolved) {
++        // The vendor tag id we were handed may not be the one the HAL registered; look
++        // the tag up in every provider's descriptor set before giving up.
++        for (const auto& candidateEntry : vTagsCache->getVendorIdsAndTagDescriptors()) {
++            const sp<VendorTagDescriptor>& candidate = candidateEntry.second;
++            if (candidate != nullptr &&
++                    CameraMetadata::getTagFromName(kSamsungSessionKeys, candidate.get(),
++                            &vendorTag) == OK) {
++                resolved = true;
++                break;
++            }
++        }
++    }
++    if (!resolved) {
++        return {};
++    }
++
++    camera_metadata_ro_entry_t entry = deviceInfo.find(vendorTag);
++    if (entry.count == 0 || entry.data.i32 == nullptr) {
++        return {};
++    }
++    return std::vector<int32_t>(entry.data.i32, entry.data.i32 + entry.count);
++}
++
++}  // namespace
++
+ void filterParameters(const CameraMetadata& src, const CameraMetadata& deviceInfo,
+         const std::vector<int32_t>& additionalTags, metadata_vendor_id_t vendorTagId,
+         CameraMetadata& dst) {
+     const CameraMetadata params(src);
+     camera_metadata_ro_entry_t availableSessionKeys = deviceInfo.find(
+             ANDROID_REQUEST_AVAILABLE_SESSION_KEYS);
+-    CameraMetadata filteredParams(availableSessionKeys.count);
++    const std::vector<int32_t> vendorSessionKeys = getVendorSessionKeys(deviceInfo, vendorTagId);
++    CameraMetadata filteredParams(availableSessionKeys.count + vendorSessionKeys.size());
+     camera_metadata_t *meta = const_cast<camera_metadata_t *>(
+             filteredParams.getAndLock());
+     set_camera_metadata_vendor_id(meta, vendorTagId);
+@@ -1249,6 +1305,7 @@
+ 
+     std::unordered_set<int32_t> filteredTags(availableSessionKeys.data.i32,
+             availableSessionKeys.data.i32 + availableSessionKeys.count);
++    filteredTags.insert(vendorSessionKeys.begin(), vendorSessionKeys.end());
+     filteredTags.insert(additionalTags.begin(), additionalTags.end());
+     for (int32_t tag : filteredTags) {
+         camera_metadata_ro_entry entry = params.find(tag);

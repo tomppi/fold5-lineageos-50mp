@@ -1,0 +1,15 @@
+=== 50MP recipe start, camera 56 ===
+session streams: RAW10 8160x6120 useCase 0x20000, JPEG 8160x6120 useCase 0x20000, YUV 1920x1440 useCase 0x10000
+camera 56 opened
+session configure FAILED
+no session
+=== 50MP recipe start, camera 56 ===
+session streams: RAW10 8160x6120 useCase 0x20000, JPEG 8160x6120 useCase 0x20000, YUV 1920x1440 useCase 0x10000
+camera 56 opened
+session configured
+repeating preview request set
+preview frames flowing
+firing still capture after 8 previews
+JPEG saved 14812179 bytes, SOF 8160x6120
+still completed
+=== done ===

@@ -1,0 +1,19 @@
+diff --git a/services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp b/services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp
+--- a/services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp
++++ b/services/camera/libcameraservice/utils/SessionConfigurationUtils.cpp
+@@ -571,7 +571,15 @@
+     // Round dimensions to the nearest dimensions available for this format.
+     // Only do the rounding if the client doesn't ask to respect the surface
+     // size.
++    // Samsung packs its OutputConfiguration "option" into the upper bits of streamUseCase
++    // (option << 16). Those streams name configurations the vendor HAL publishes only in
++    // its private tags (samsung.android.scaler.availableHighresRawStreamConfigurations and
++    // friends), never in the standard SCALER_STREAM_CONFIGURATION_MAP, so AOSP's rounding
++    // check rejects 8160x6120 RAW10 outright. The vendor HAL validates the combination, so
++    // do not second-guess it here.
++    const bool samsungVendorStreamOption = (streamUseCase & 0xFFFF0000LL) != 0;
+     if (flexibleConsumer && isPublicFormat(format) && !respectSurfaceSize &&
++            !samsungVendorStreamOption &&
+             !SessionConfigurationUtils::roundBufferDimensionNearest(width, height,
+             format, dataSpace, physicalCameraMetadata, foundInMaxRes, /*out*/&width,
+             /*out*/&height, isPriviledgedClient)) {

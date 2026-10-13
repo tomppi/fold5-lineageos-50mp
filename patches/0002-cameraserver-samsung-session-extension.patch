@@ -1,0 +1,117 @@
+diff --git a/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.cpp b/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.cpp
+index eae66e8322..7b1b667705 100644
+--- a/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.cpp
++++ b/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.cpp
+@@ -53,6 +53,9 @@
+ #include <aidl/android/hardware/camera/device/ICameraInjectionSession.h>
+ #include <aidlcommonsupport/NativeHandle.h>
+ #include <android-base/properties.h>
++#include <android/binder_libbinder.h>
++#include <binder/IBinder.h>
++#include <binder/Parcel.h>
+ #include <android/content/res/CameraCompatibilityInfo.h>
+ #include <android/binder_ibinder_platform.h>
+ #include <android/hardware/camera2/ICameraDeviceUser.h>
+@@ -906,6 +909,58 @@ status_t AidlCamera3Device::AidlHalInterface::constructDefaultRequestSettings(
+     return res;
+ }
+ 
++namespace {
++// Samsung's private camera session extension: one method, setParameters, which
++// carries One UI's PDK parameter string to the vendor HAL.
++constexpr const char* kSehSessionDescriptor =
++        "vendor.samsung.hardware.camera.device.ISehCameraDeviceSession";
++constexpr int32_t kSehSetParametersTransaction = 1;
++// Samsung's OutputConfiguration option 2, packed into the stream use case as
++// option << 16; the vendor HAL reads it back as the stream option.
++constexpr int64_t kSamsungHighResStreamUseCase = 0x20000;
++}  // namespace
++
++status_t AidlCamera3Device::AidlHalInterface::sendSamsungSetParameters(const char* params) {
++    if (mAidlSession == nullptr) {
++        return NO_INIT;
++    }
++    if (params == nullptr || params[0] == 0) {
++        return OK;
++    }
++    ndk::SpAIBinder sessionBinder = mAidlSession->asBinder();
++    if (sessionBinder.get() == nullptr) {
++        return NO_INIT;
++    }
++    // Samsung carries ISehCameraDeviceSession as an AIDL binder extension on the
++    // standard session binder; the session binder itself only implements the AOSP
++    // interface, so a transaction addressed to the Samsung interface there is
++    // rejected (FAILED_TRANSACTION).
++    sp<IBinder> platformBinder;
++    AIBinder* extension = nullptr;
++    if (AIBinder_getExtension(sessionBinder.get(), &extension) == STATUS_OK &&
++            extension != nullptr) {
++        platformBinder = AIBinder_toPlatformBinder(extension);
++        AIBinder_decStrong(extension);
++    }
++    if (platformBinder == nullptr) {
++        ALOGW("%s: session has no Samsung extension", __FUNCTION__);
++        return INVALID_OPERATION;
++    }
++    Parcel data, reply;
++    status_t res = data.writeInterfaceToken(String16(kSehSessionDescriptor));
++    if (res != OK) {
++        return res;
++    }
++    res = data.writeString16(String16(params));
++    if (res != OK) {
++        return res;
++    }
++    res = platformBinder->transact(kSehSetParametersTransaction, data, &reply,
++            IBinder::FLAG_PRIVATE_VENDOR);
++    ALOGI("%s: Samsung setParameters -> %d", __FUNCTION__, res);
++    return res;
++}
++
+ status_t AidlCamera3Device::AidlHalInterface::configureStreams(
+         const camera_metadata_t *sessionParams,
+         camera_stream_configuration *config, const std::vector<uint32_t>& bufferSizes,
+@@ -989,6 +1044,27 @@ status_t AidlCamera3Device::AidlHalInterface::configureStreams(
+                 sessionParamP, sessionParamP + sessionParamSize);
+     requestedConfiguration.operationMode = operationMode;
+ 
++    // REA: Samsung's high-resolution stream option asks the vendor HAL for a
++    // 50 MP remosaic session. One UI sets the shooting mode through the private
++    // session parameter channel immediately before configuring such a session;
++    // reproduce that ordering here.
++    bool samsungHighResRequested = false;
++    for (size_t i = 0; i < config->num_streams; i++) {
++        if (config->streams[i]->use_case == kSamsungHighResStreamUseCase) {
++            samsungHighResRequested = true;
++            break;
++        }
++    }
++    if (samsungHighResRequested) {
++        std::string samsungParams = android::base::GetProperty(
++                "persist.camera.samsung_hr_params",
++                "first-entrance=false;samsungcamera=true;factorytest=false;shootingmode=40;"
++                "recording-fps=0;sw-vdis=false;video-beautyface=false;vtmode=0;"
++                "operation_mode=none;ssm_shot_mode=2;recording_dr_mode=sdr;sw-super_vdis=false;"
++                "stream_type=0;");
++        sendSamsungSetParameters(samsungParams.c_str());
++    }
++
+     // Invoke configureStreams
+     std::vector<camera::device::HalStream> finalConfiguration;
+ 
+diff --git a/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.h b/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.h
+index bb6eb9ae6b..9757283732 100644
+--- a/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.h
++++ b/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.h
+@@ -111,6 +111,11 @@ class AidlCamera3Device :
+                 const std::vector<uint32_t>& bufferSizes,
+                 int64_t logId) override;
+ 
++        // REA: forward One UI's PDK parameter string over Samsung's private
++        // ISehCameraDeviceSession.setParameters (transaction 1). The vendor HAL
++        // selects its HighResolution (50 MP) use case from that string.
++        status_t sendSamsungSetParameters(const char* params);
++
+         // The injection camera configures the streams to hal.
+         virtual status_t configureInjectedStreams(
+                 const camera_metadata_t* sessionParams,

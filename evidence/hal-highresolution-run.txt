@@ -1,0 +1,30 @@
+# Captured 2026-10-13 13:30, SM-F946B (LineageOS 23.2), camera 56, probe app 'Run 50MP recipe'
+
+## cameraserver: the Samsung session-extension call our patch issues
+10-13 13:14:21.192 I/AidlCamera3-Device(18299): sendSamsungSetParameters: Samsung setParameters -> 0
+10-13 13:30:42.755 I/AidlCamera3-Device(31165): sendSamsungSetParameters: Samsung setParameters -> 0
+10-13 13:30:51.079 I/AidlCamera3-Device(31165): sendSamsungSetParameters: Samsung setParameters -> 0
+
+## Vendor HAL: parameter string accepted, HighResolution scenario selected
+10-13 13:30:42.755 I/Unihal  ( 1620): ScenarioManager.cpp: FindScenarioInfo: 2566: Current shootingMode=0x00000028(UNI_SHOOTING_MODE_GALAXY_RAW_HIRES), cameraId=56(LOGICAL_REAR)
+10-13 13:30:42.755 I/Unihal  ( 1620): ScenarioManager.cpp: CheckEnableCondition: 2831: Unihal is enabled. : isSamsungCamera=true, isFactoryTest=false, isGalaxyRaw = false, isAllowed3rdParty=false, foundScenario=true, isValidStreamConfiguration=true, isSamsungVdisEnabled=false, isSamsungSelfieToneTo3rdParty=true, isTestPatternMode=false, shootingMode=UNI_SHOOTING_MODE_GALAXY_RAW_HIRES
+10-13 13:30:51.078 I/Unihal  ( 1620): UniHal3InterfaceEntry.cpp: uni_set_parameters: 506: set_parameters : first-entrance=false;samsungcamera=true;factorytest=false;shootingmode=40;recording-fps=0;sw-vdis=false;video-beautyface=false;vtmode=0;operation_mode=none;ssm_shot_mode=2;recording_dr_mode=sdr;sw-super_vdis=false;stream_type=0;
+10-13 13:30:51.080 I/Unihal  ( 1620): ScenarioManager.cpp: FindScenarioInfo: 2552: Scenario Lib Path : /vendor/lib64/unihal_scenario.so
+10-13 13:30:51.080 I/Unihal  ( 1620): ScenarioManager.cpp: FindScenarioInfo: 2566: Current shootingMode=0x00000028(UNI_SHOOTING_MODE_GALAXY_RAW_HIRES), cameraId=56(LOGICAL_REAR)
+10-13 13:30:51.081 I/Unihal  ( 1620): ScenarioManager.cpp: CheckEnableCondition: 2831: Unihal is enabled. : isSamsungCamera=true, isFactoryTest=false, isGalaxyRaw = false, isAllowed3rdParty=false, foundScenario=true, isValidStreamConfiguration=true, isSamsungVdisEnabled=false, isSamsungSelfieToneTo3rdParty=true, isTestPatternMode=false, shootingMode=UNI_SHOOTING_MODE_GALAXY_RAW_HIRES
+
+## Vendor HAL: the remosaic pipeline itself (CHI_HR)
+10-13 13:30:52.906 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: SubmitOfflineBpsIpeNodeRequest: 9868: Sending Basic snapshot framenum: 13, requestIdx: 0
+10-13 13:30:52.906 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: needToHRShot: 12166: [HR] HighResolution Shot with Single Shot
+10-13 13:30:52.906 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: needToHRShot: 12166: [HR] HighResolution Shot with Single Shot
+10-13 13:30:52.906 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: SetHRCapture: 12094: [HR] REQUEST IS MADE FOR: 0x35
+10-13 13:30:52.907 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: ExecuteCaptureRequest: 7775: [HR] 1. HighResolution request has come for m_nextAppResultFrame: 12
+10-13 13:30:52.907 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: FlushSession: 11515: [Sec] E session 0xb40000720c5a4070
+10-13 13:30:53.521 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: FlushSession: 11522: [Sec] X
+10-13 13:30:53.521 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: ExecuteCaptureRequest: 7883: [HR] 2. Destroying Binning Preview Session.
+10-13 13:30:53.726 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: ExecuteCaptureRequest: 7899: [HR] 3. Destroyed Binning Preview Session. Creating Quadra Preview Session...
+10-13 13:30:53.782 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: CreateHRSession: 12046: [HR] m_pHighResolutionRTPSession created
+10-13 13:30:53.782 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: ActivateRealtimePipeline: 11824: [HR] CreateHRSession Success
+10-13 13:30:53.782 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: ExecuteCaptureRequest: 7923: [HR] 4. Created Quadra Preview Session. Waiting for Rdi...
+10-13 13:30:53.844 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.h: CheckHighResSessionActive: 624: [HR] ActivatePipeline for HighResolutionAiRealtimeSensor2RDI
+10-13 13:30:53.844 I/CHI     ( 1620): [SS_LOW ]: [CHI_HR      ]: chxsecusecasehighresolution.cpp: ExecuteCaptureRequest: 8153: [HR]: RDI for Highresolution = 13
