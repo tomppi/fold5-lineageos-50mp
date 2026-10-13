@@ -1,0 +1,51 @@
+diff --git a/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.cpp b/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.cpp
+index eae66e8322..d68be18188 100644
+--- a/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.cpp
++++ b/services/camera/libcameraservice/device3/aidl/AidlCamera3Device.cpp
+@@ -989,6 +1044,46 @@ status_t AidlCamera3Device::AidlHalInterface::configureStreams(
+                 sessionParamP, sessionParamP + sessionParamSize);
+     requestedConfiguration.operationMode = operationMode;
+ 
++    // REA: Samsung's high-resolution stream option asks the vendor HAL for a
++    // 50 MP remosaic session. One UI sets the shooting mode through the private
++    // session parameter channel immediately before configuring such a session;
++    // reproduce that ordering here.
++    bool samsungHighResRequested = false;
++    for (size_t i = 0; i < config->num_streams; i++) {
++        if (config->streams[i]->use_case == kSamsungHighResStreamUseCase) {
++            // Choose the Samsung scenario from the stream shape the client asked for:
++            //  - Pro RAW (RAW_SENSOR at high resolution) -> UNI_SHOOTING_MODE_GALAXY_RAW (38),
++            //    the mode that delivers raw frames to the app ("Expert RAW")
++            //  - the RAW10 high-resolution path            -> UNI_SHOOTING_MODE_GALAXY_RAW_HIRES (40)
++            // which is the mode the HAL does its own remosaic in and returns a JPEG.
++            // persist.camera.samsung_hr_params still overrides the whole string when set.
++            bool proRaw = false;
++            for (size_t s = 0; s < config->num_streams; s++) {
++                const camera3::camera_stream_t *st = config->streams[s];
++                if (st->format == HAL_PIXEL_FORMAT_RAW16 && st->width >= 8000) {
++                    proRaw = true;
++                    break;
++                }
++            }
++            char override[PROPERTY_VALUE_MAX] = {0};
++            property_get("persist.camera.samsung_hr_params", override, "");
++            std::string samsungParams;
++            if (override[0] != 0) {
++                samsungParams = override;
++            } else {
++                samsungParams = fmt::sprintf(
++                        "first-entrance=false;samsungcamera=true;factorytest=false;shootingmode=%d;"
++                        "recording-fps=0;sw-vdis=false;video-beautyface=false;vtmode=0;"
++                        "operation_mode=none;ssm_shot_mode=2;recording_dr_mode=sdr;"
++                        "sw-super_vdis=false;stream_type=0;",
++                        proRaw ? 38 : 40);
++            }
++            ALOGI("%s: Samsung scenario for %s streams: shootingmode=%d",
++                    __FUNCTION__, proRaw ? "Pro RAW" : "high-res", proRaw ? 38 : 40);
++            sendSamsungSetParameters(samsungParams.c_str());
++        }
++    }
++
+     // Invoke configureStreams
+     std::vector<camera::device::HalStream> finalConfiguration;
+ 

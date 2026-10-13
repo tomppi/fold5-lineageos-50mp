@@ -165,3 +165,20 @@ provide, and documents where AOSP has to be taught about Samsung's private inter
   and the stock firmware is the user's own.
 - Reverse engineering for interoperability on hardware you own; check your local rules
   and your warranty before flashing anything.
+
+## Scenario selection: 50 MP JPEG and Expert RAW
+
+The patched cameraserver chooses the Samsung scenario from the stream shape the client asks for,
+inside AidlCamera3Device::configureStreams:
+
+* a Pro RAW stream (RAW_SENSOR, format 0x20, width >= 8000) -> shootingmode=38,
+  UNI_SHOOTING_MODE_GALAXY_RAW, the mode that delivers raw frames to the app
+* anything else -> shootingmode=40, UNI_SHOOTING_MODE_GALAXY_RAW_HIRES, the mode the HAL does
+  its own remosaic in and returns an 8160x6120 JPEG for
+
+That is patch 0004-scenario-from-stream-shape.patch. persist.camera.samsung_hr_params still
+overrides the whole string when set, so the sweep and experiment workflow is unchanged. The mode
+values were established by sweeping the vendor PDK parameter: 38 = GALAXY_RAW (isGalaxyRaw=true),
+40 = GALAXY_RAW_HIRES.
+
+The Expert RAW capture itself lives in a separate app: https://github.com/tomppi/fold5-raw
