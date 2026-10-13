@@ -1,0 +1,48 @@
+# Durability check: cold boot with module v8 active
+
+Verified 2026-10-13. The device was rebooted with module v8 installed and the patched
+binary staged on the module's private tmpfs.
+
+## /data/adb/q5q_cam_module.log (module scripts)
+
+02-17 22:02:20 post-fs-data(v5): start
+02-17 22:02:20 bind mount from tmpfs OK
+02-17 22:02:20 label now: u:object_r:cameraserver_exec:s0  /system/bin/cameraserver
+10-13 14:03:46 service(v8): boot state=running binary=46a754741d38561816c96ca4a5d61eb0 want=46a754741d38561816c96ca4a5d61eb0
+10-13 14:03:51 service(v8): patched cameraserver running (md5 match)
+
+The `02-17` timestamps are the pre-NTP clock at post-fs-data time; those three lines are
+from the same boot as the `10-13 14:03` ones.
+
+## Running service after that boot
+
+```
+init.svc.cameraserver : running
+/system/bin/cameraserver : md5 46a754741d38561816c96ca4a5d61eb0
+label : u:object_r:cameraserver_exec:s0
+mount : /cameraserver from tmpfs /mnt/rea_cameraserver (post-fs-data staging)
+servicemanager : ICameraService/default registered, sid=u:r:cameraserver:s0
+```
+
+init accepted the tmpfs-staged entry point and performed the domain transition, so the
+earlier failure mode (bind mount from /data -> security_bounded_transition denied ->
+status 127, no camera service) does not recur. The `service.sh` pass found the binary
+already correct and did not need to re-stage.
+
+## Probe app run after that boot (highres.log)
+
+```
+=== 50MP recipe start, camera 56 ===
+session streams: RAW10 8160x6120 useCase 0x20000, JPEG 8160x6120 useCase 0x20000, YUV 1920x1440 useCase 0x10000
+camera 56 opened
+session configured
+repeating preview request set
+preview frames flowing
+firing still capture after 8 previews
+JPEG saved 12215212 bytes, SOF 8160x6120
+still completed
+=== done ===
+```
+
+That second capture (12,215,212 bytes, 8160x6120) is not committed here — the repository
+keeps one image, from the first run; this run is the cross-reboot confirmation.

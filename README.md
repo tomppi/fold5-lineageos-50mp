@@ -110,16 +110,37 @@ The module replaces `/system/bin/cameraserver` with the patched build:
 - `post-fs-data.sh` mounts a private tmpfs, copies the binary there, labels it
   `u:object_r:cameraserver_exec:s0` and bind-mounts it over `/system/bin/cameraserver`
   before init starts class `main`.
-- `service.sh` logs whether the service came up and retries `ctl.start` once.
+- `service.sh` verifies **what actually ended up running**: it compares the md5 of
+  `/system/bin/cameraserver` with the module's binary and, if they differ (for example
+  when the overlayfs metamodule mounts its `/system` overlay after the early bind mount
+  and hides it — the v4 failure), re-stages from the tmpfs on top of everything and
+  `ctl.restart cameraserver`. A failed staging is safe: with `skip_mount` and no mount,
+  `/system/bin/cameraserver` stays the ROM's stock binary and the camera keeps working.
 
 Package it as a zip with the patched binary at `system/bin/cameraserver`, install with
 KernelSU Manager (or `ksud module install`), reboot. Uninstall + reboot restores stock.
+
+## Verified across a cold boot
+
+The module was installed, the device rebooted, and the chain verified afterwards — see
+[`evidence/boot-verification.txt`](evidence/boot-verification.txt):
+
+```
+post-fs-data: bind mount from tmpfs OK, label u:object_r:cameraserver_exec:s0
+service(v8): boot state=running binary=46a75474... want=46a75474...
+service(v8): patched cameraserver running (md5 match)
+```
+
+init started the patched daemon from the tmpfs stage (`sid=u:r:cameraserver:s0`), and a
+probe run after that boot produced another 8160x6120 JPEG. The 50 MP path therefore
+survives reboots; it is not a runtime-only adb mount.
 
 ## Evidence (`evidence/`)
 
 - `fold5-50mp-8160x6120.jpg` — the capture (8160x6120, 14,812,179 bytes)
 - `highres.log` — the app's run log
 - `hal-highresolution-run.txt` — cameraserver call, HAL scenario selection, CHI_HR pipeline
+- `boot-verification.txt` — module log, post-boot service state and post-reboot probe run
 
 ## Prior art and credit
 
